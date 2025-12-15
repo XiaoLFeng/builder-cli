@@ -155,7 +155,7 @@ func printBuildError(m tui.Model) {
 	logBoxStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("#555555")).
-		Padding(0, 1).
+		Padding(0, 0).
 		Foreground(lipgloss.Color("#AAAAAA"))
 
 	fmt.Println()

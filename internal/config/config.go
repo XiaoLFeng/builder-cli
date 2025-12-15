@@ -118,6 +118,7 @@ type AutoScanConfig struct {
 	Exclude     []string `yaml:"exclude,omitempty"`
 	ImagePrefix string   `yaml:"image_prefix,omitempty"`
 	Tag         string   `yaml:"tag,omitempty"`
+	Platforms   []string `yaml:"platforms,omitempty"` // 多平台构建，如 ["linux/amd64", "linux/arm64"]
 }
 
 // Hooks 钩子配置

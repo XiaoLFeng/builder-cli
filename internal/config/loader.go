@@ -96,6 +96,11 @@ func (l *Loader) replaceInPipeline(stages []Stage, vars map[string]string) {
 				task.Config.Commands[k] = l.expandVars(task.Config.Commands[k], vars)
 			}
 
+			// 替换 platforms 数组
+			for k := range task.Config.Platforms {
+				task.Config.Platforms[k] = l.expandVars(task.Config.Platforms[k], vars)
+			}
+
 			// 替换 build_args
 			for k, v := range task.Config.BuildArgs {
 				task.Config.BuildArgs[k] = l.expandVars(v, vars)

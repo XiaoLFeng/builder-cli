@@ -258,6 +258,7 @@ type DockerScanner struct {
 	exclude     []string
 	imagePrefix string
 	tag         string
+	platforms   []string // 多平台构建支持
 }
 
 // NewDockerScanner 创建 Dockerfile 扫描器
@@ -268,6 +269,7 @@ func NewDockerScanner(rootDir string, cfg *config.AutoScanConfig) *DockerScanner
 		exclude:     cfg.Exclude,
 		imagePrefix: cfg.ImagePrefix,
 		tag:         cfg.Tag,
+		platforms:   cfg.Platforms,
 	}
 
 	if s.pattern == "" {
@@ -346,6 +348,7 @@ func (s *DockerScanner) createExecutor(dockerfilePath string) *DockerBuildExecut
 		Context:    contextDir,
 		ImageName:  imageName,
 		Tag:        s.tag,
+		Platforms:  s.platforms,
 	}
 
 	return NewDockerBuildExecutor(fmt.Sprintf("build-%s", dirName), cfg)
