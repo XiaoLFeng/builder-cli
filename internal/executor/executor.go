@@ -42,6 +42,7 @@ const (
 	TypeDockerPush  = "docker-push"
 	TypeSSH         = "ssh"
 	TypeCommand     = "command"
+	TypeGoBuild     = "go-build"
 )
 
 // BaseExecutor 基础执行器（可嵌入其他执行器）

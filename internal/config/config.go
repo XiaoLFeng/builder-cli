@@ -85,6 +85,22 @@ type TaskConfig struct {
 	Server      string   `yaml:"server,omitempty"`
 	Commands    []string `yaml:"commands,omitempty"`
 	LocalScript string   `yaml:"local_script,omitempty"`
+
+	// Go Build 配置
+	GoCommand  string `yaml:"go_command,omitempty"`  // go 子命令: build/test/generate (默认 build)
+	GoOS       string `yaml:"goos,omitempty"`        // 目标操作系统
+	GoArch     string `yaml:"goarch,omitempty"`      // 目标架构
+	Output     string `yaml:"output,omitempty"`      // 输出文件路径 (-o)
+	LDFlags    string `yaml:"ldflags,omitempty"`     // 链接标志 (-ldflags)
+	BuildTags  string `yaml:"tags,omitempty"`        // 构建标签 (-tags)
+	CGOEnabled *bool  `yaml:"cgo_enabled,omitempty"` // CGO 开关 (指针区分未设置和 false)
+	GoPrivate  string `yaml:"goprivate,omitempty"`   // GOPRIVATE 环境变量
+	GoProxy    string `yaml:"goproxy,omitempty"`     // GOPROXY 环境变量
+	Race       bool   `yaml:"race,omitempty"`        // 竞态检测 (-race)
+	Trimpath   bool   `yaml:"trimpath,omitempty"`    // 移除路径 (-trimpath)
+	Mod        string `yaml:"mod,omitempty"`         // 模块模式 (-mod=vendor/readonly/mod)
+	Packages   string `yaml:"packages,omitempty"`    // 目标包 (默认 .)
+	GoVerbose  bool   `yaml:"go_verbose,omitempty"`  // 详细输出 (-v)
 }
 
 // GetTimeoutDuration 返回超时时间的 Duration 格式
@@ -117,4 +133,5 @@ const (
 	TaskTypeDockerBuild = "docker-build"
 	TaskTypeDockerPush  = "docker-push"
 	TaskTypeSSH         = "ssh"
+	TaskTypeGoBuild     = "go-build"
 )
