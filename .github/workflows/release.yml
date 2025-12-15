@@ -154,19 +154,24 @@ jobs:
 
   # Job 4: 更新 Homebrew Tap (可选)
   update-homebrew:
-    name: Update Homebrew tap
+    name: Update Homebrew Formula
     needs: upload
     runs-on: ubuntu-latest
     if: ${{ vars.HOMEBREW_TAP_ENABLED == 'true' }}
+    continue-on-error: true
+
     steps:
-      - name: Get version
+      - name: Extract version
         id: version
         run: |
-          VERSION=${GITHUB_REF#refs/tags/}
-          echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
-          echo "VERSION_NUM=${VERSION#v}" >> $GITHUB_OUTPUT
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          # 生成类名后缀（去掉点，如 0.0.4 → 004）
+          CLASS_SUFFIX=$(echo "$VERSION" | tr -d '.')
+          echo "class_suffix=$CLASS_SUFFIX" >> $GITHUB_OUTPUT
+          echo "Updating Homebrew Formula to version: $VERSION"
 
-      - name: Checkout homebrew-tap
+      - name: Checkout homebrew-tap repository
         uses: actions/checkout@v4
         with:
           repository: ${{ github.repository_owner }}/homebrew-tap
@@ -179,9 +184,66 @@ jobs:
           name: checksums
           path: .
 
-      - name: Update formula
+      - name: Get old version
+        id: old_version
+        working-directory: homebrew-tap
         run: |
-          cd homebrew-tap
+          FORMULA_FILE="Formula/x/${{ env.BINARY_NAME }}.rb"
+          if [ -f "$FORMULA_FILE" ]; then
+            OLD_VERSION=$(grep -oP 'version "\K[0-9]+\.[0-9]+\.[0-9]+' "$FORMULA_FILE" || echo "")
+            if [ -n "$OLD_VERSION" ]; then
+              echo "old_version=$OLD_VERSION" >> $GITHUB_OUTPUT
+              OLD_CLASS_SUFFIX=$(echo "$OLD_VERSION" | tr -d '.')
+              echo "old_class_suffix=$OLD_CLASS_SUFFIX" >> $GITHUB_OUTPUT
+              echo "Current version in Formula: $OLD_VERSION"
+            else
+              echo "old_version=" >> $GITHUB_OUTPUT
+              echo "No existing version found"
+            fi
+          else
+            echo "old_version=" >> $GITHUB_OUTPUT
+            echo "Formula file does not exist yet"
+          fi
+
+      - name: Create versioned Formula for old version
+        if: ${{ steps.old_version.outputs.old_version != '' }}
+        working-directory: homebrew-tap
+        env:
+          OLD_VERSION: ${{ steps.old_version.outputs.old_version }}
+          OLD_CLASS_SUFFIX: ${{ steps.old_version.outputs.old_class_suffix }}
+        run: |
+          VERSIONED_FILE="Formula/x/${{ env.BINARY_NAME }}@${OLD_VERSION}.rb"
+
+          if [ -f "$VERSIONED_FILE" ]; then
+            echo "Versioned Formula already exists: $VERSIONED_FILE"
+            exit 0
+          fi
+
+          echo "Creating versioned Formula: $VERSIONED_FILE"
+
+          # 复制主 Formula
+          cp "Formula/x/${{ env.BINARY_NAME }}.rb" "$VERSIONED_FILE"
+
+          # 修改文件头注释
+          sed -i "s/# Formula for ${{ env.BINARY_NAME }}/# Formula for ${{ env.BINARY_NAME }}@${OLD_VERSION}/" "$VERSIONED_FILE"
+
+          # 修改类名: Xbuilder → XbuilderATXXX
+          sed -i "s/class Xbuilder < Formula/class XbuilderAT${OLD_CLASS_SUFFIX} < Formula/" "$VERSIONED_FILE"
+
+          # 在 caveats 中添加固定版本警告（如果存在 caveats）
+          if grep -q "def caveats" "$VERSIONED_FILE"; then
+            sed -i '/def caveats/,/end/s/EOS/\n      ⚠️  注意：这是一个固定版本的 Formula\n      - 此版本不会自动更新到更高版本\n      - 如需最新版本，请使用：brew install ${{ env.BINARY_NAME }}\n    EOS/' "$VERSIONED_FILE"
+          fi
+
+          echo "Created versioned Formula: $VERSIONED_FILE"
+
+      - name: Update main Formula
+        working-directory: homebrew-tap
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          # 创建 Formula 目录（按首字母分组）
+          mkdir -p Formula/x
 
           # 获取各平台的 SHA256
           DARWIN_AMD64_SHA=$(grep 'darwin-amd64' ../checksums.txt | awk '{print $1}')
@@ -189,54 +251,65 @@ jobs:
           LINUX_AMD64_SHA=$(grep 'linux-amd64' ../checksums.txt | awk '{print $1}')
           LINUX_ARM64_SHA=$(grep 'linux-arm64' ../checksums.txt | awk '{print $1}')
 
-          VERSION="${{ steps.version.outputs.VERSION_NUM }}"
-
-          # 创建 Formula 目录
-          mkdir -p Formula
+          FORMULA_FILE="Formula/x/${{ env.BINARY_NAME }}.rb"
 
           # 生成 Formula
-          cat > Formula/${{ env.BINARY_NAME }}.rb << EOF
+          cat > "$FORMULA_FILE" << 'EOF'
+          # Formula for xbuilder
+          # 构建部署流水线 CLI 工具
           class Xbuilder < Formula
             desc "CLI tool for building and deploying applications with pipeline support"
             homepage "https://github.com/${{ github.repository }}"
-            version "${VERSION}"
+            version "VERSION_PLACEHOLDER"
             license "MIT"
 
             on_macos do
               if Hardware::CPU.arm?
-                url "https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.VERSION }}/${{ env.BINARY_NAME }}-darwin-arm64"
-                sha256 "${DARWIN_ARM64_SHA}"
+                url "https://github.com/${{ github.repository }}/releases/download/vVERSION_PLACEHOLDER/${{ env.BINARY_NAME }}-darwin-arm64"
+                sha256 "DARWIN_ARM64_SHA_PLACEHOLDER"
               else
-                url "https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.VERSION }}/${{ env.BINARY_NAME }}-darwin-amd64"
-                sha256 "${DARWIN_AMD64_SHA}"
+                url "https://github.com/${{ github.repository }}/releases/download/vVERSION_PLACEHOLDER/${{ env.BINARY_NAME }}-darwin-amd64"
+                sha256 "DARWIN_AMD64_SHA_PLACEHOLDER"
               end
             end
 
             on_linux do
               if Hardware::CPU.arm?
-                url "https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.VERSION }}/${{ env.BINARY_NAME }}-linux-arm64"
-                sha256 "${LINUX_ARM64_SHA}"
+                url "https://github.com/${{ github.repository }}/releases/download/vVERSION_PLACEHOLDER/${{ env.BINARY_NAME }}-linux-arm64"
+                sha256 "LINUX_ARM64_SHA_PLACEHOLDER"
               else
-                url "https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.VERSION }}/${{ env.BINARY_NAME }}-linux-amd64"
-                sha256 "${LINUX_AMD64_SHA}"
+                url "https://github.com/${{ github.repository }}/releases/download/vVERSION_PLACEHOLDER/${{ env.BINARY_NAME }}-linux-amd64"
+                sha256 "LINUX_AMD64_SHA_PLACEHOLDER"
               end
             end
 
             def install
-              binary_name = "${{ env.BINARY_NAME }}"
               if OS.mac?
                 if Hardware::CPU.arm?
-                  bin.install "${{ env.BINARY_NAME }}-darwin-arm64" => binary_name
+                  bin.install "${{ env.BINARY_NAME }}-darwin-arm64" => "${{ env.BINARY_NAME }}"
                 else
-                  bin.install "${{ env.BINARY_NAME }}-darwin-amd64" => binary_name
+                  bin.install "${{ env.BINARY_NAME }}-darwin-amd64" => "${{ env.BINARY_NAME }}"
                 end
               elsif OS.linux?
                 if Hardware::CPU.arm?
-                  bin.install "${{ env.BINARY_NAME }}-linux-arm64" => binary_name
+                  bin.install "${{ env.BINARY_NAME }}-linux-arm64" => "${{ env.BINARY_NAME }}"
                 else
-                  bin.install "${{ env.BINARY_NAME }}-linux-amd64" => binary_name
+                  bin.install "${{ env.BINARY_NAME }}-linux-amd64" => "${{ env.BINARY_NAME }}"
                 end
               end
+            end
+
+            def caveats
+              <<~EOS
+                🎉 ${{ env.BINARY_NAME }} 已成功安装！
+
+                快速开始：
+                  ${{ env.BINARY_NAME }} --help     # 查看帮助
+                  ${{ env.BINARY_NAME }} init       # 初始化配置
+                  ${{ env.BINARY_NAME }} run        # 运行构建
+
+                文档：https://github.com/${{ github.repository }}
+              EOS
             end
 
             test do
@@ -245,14 +318,48 @@ jobs:
           end
           EOF
 
-          echo "Formula created:"
-          cat Formula/${{ env.BINARY_NAME }}.rb
+          # 替换占位符
+          sed -i "s/VERSION_PLACEHOLDER/${VERSION}/g" "$FORMULA_FILE"
+          sed -i "s/DARWIN_AMD64_SHA_PLACEHOLDER/${DARWIN_AMD64_SHA}/g" "$FORMULA_FILE"
+          sed -i "s/DARWIN_ARM64_SHA_PLACEHOLDER/${DARWIN_ARM64_SHA}/g" "$FORMULA_FILE"
+          sed -i "s/LINUX_AMD64_SHA_PLACEHOLDER/${LINUX_AMD64_SHA}/g" "$FORMULA_FILE"
+          sed -i "s/LINUX_ARM64_SHA_PLACEHOLDER/${LINUX_ARM64_SHA}/g" "$FORMULA_FILE"
 
-      - name: Commit and push
+          echo "Updated Formula:"
+          cat "$FORMULA_FILE"
+
+      - name: Commit and push changes
+        working-directory: homebrew-tap
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          OLD_VERSION: ${{ steps.old_version.outputs.old_version }}
         run: |
-          cd homebrew-tap
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add .
-          git commit -m "Update ${{ env.BINARY_NAME }} to ${{ steps.version.outputs.VERSION }}" || echo "No changes to commit"
-          git push
+
+          # 检查是否有变更
+          if git diff --quiet && [ -z "$(git ls-files --others --exclude-standard)" ]; then
+            echo "No changes to commit (version might already be up to date)"
+            exit 0
+          fi
+
+          git add Formula/x/
+
+          # 判断是否创建了版本化 Formula
+          if [ -n "$OLD_VERSION" ] && [ -f "Formula/x/${{ env.BINARY_NAME }}@${OLD_VERSION}.rb" ] && git diff --cached --name-only | grep -q "@"; then
+            git commit -m "chore(${{ env.BINARY_NAME }}): bump to v${VERSION}, archive v${OLD_VERSION}
+
+          - Update ${{ env.BINARY_NAME }}.rb to version ${VERSION}
+          - Create ${{ env.BINARY_NAME }}@${OLD_VERSION}.rb for version pinning
+
+          Automated update from ${{ env.BINARY_NAME }} release workflow.
+          Release: https://github.com/${{ github.repository }}/releases/tag/v${VERSION}"
+          else
+            git commit -m "chore(${{ env.BINARY_NAME }}): bump version to ${VERSION}
+
+          Automated update from ${{ env.BINARY_NAME }} release workflow.
+          Release: https://github.com/${{ github.repository }}/releases/tag/v${VERSION}"
+          fi
+
+          git push origin master
+          echo "✅ Successfully updated homebrew-tap!"
