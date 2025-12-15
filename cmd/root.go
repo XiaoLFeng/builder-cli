@@ -17,7 +17,10 @@ var rootCmd = &cobra.Command{
 	Use:   "xbuilder",
 	Short: "xbuilder - 美观的 TUI 构建工具",
 	Long: `xbuilder 是一个基于 Bubble Tea + Lipgloss 的美观 TUI 构建工具，
-支持 Maven 构建、Docker 镜像构建推送、SSH 远程部署。
+支持 Maven 构建、Go 构建、Docker 镜像构建推送、SSH 远程部署。
+
+作者: 筱锋 (xiao_lfeng)
+项目: https://github.com/XiaoLFeng/builder-cli
 
 使用示例:
   xbuilder init                    # 初始化最小配置文件
@@ -42,7 +45,10 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "配置文件路径 (默认: xbuilder.yaml)")
 
 	// 版本信息格式
-	rootCmd.SetVersionTemplate(fmt.Sprintf("xbuilder version %s\n", version.Version))
+	rootCmd.SetVersionTemplate(fmt.Sprintf(`xbuilder version %s
+Author: 筱锋 (xiao_lfeng)
+GitHub: https://github.com/XiaoLFeng/builder-cli
+`, version.Version))
 }
 
 // GetConfigFile 获取配置文件路径

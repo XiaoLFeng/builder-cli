@@ -1,0 +1,258 @@
+# xbuilder Release Workflow
+# 自动构建多平台二进制并发布到 GitHub Release
+
+name: Release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+env:
+  GO_VERSION: '1.25'
+  BINARY_NAME: 'xbuilder'
+
+jobs:
+  # Job 1: 多平台编译
+  build:
+    name: Build ${{ matrix.goos }}-${{ matrix.goarch }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          # Linux
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          # macOS
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+          # Windows
+          - goos: windows
+            goarch: amd64
+          - goos: windows
+            goarch: arm64
+          # FreeBSD
+          - goos: freebsd
+            goarch: amd64
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Get version
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Build binary
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 0
+        run: |
+          # 设置输出文件名
+          EXT=""
+          if [ "$GOOS" = "windows" ]; then
+            EXT=".exe"
+          fi
+          OUTPUT_NAME="${{ env.BINARY_NAME }}-${GOOS}-${GOARCH}${EXT}"
+
+          # 编译 (注入版本信息)
+          echo "Building ${OUTPUT_NAME}..."
+          go build -ldflags="-s -w -X github.com/xiaolfeng/builder-cli/pkg/version.Version=${{ steps.version.outputs.VERSION }}" \
+            -o "${OUTPUT_NAME}" .
+
+          # 生成校验和
+          sha256sum "${OUTPUT_NAME}" > "${OUTPUT_NAME}.sha256"
+
+          echo "Build complete: ${OUTPUT_NAME}"
+          ls -la "${OUTPUT_NAME}"*
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.BINARY_NAME }}-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: ${{ env.BINARY_NAME }}-${{ matrix.goos }}-${{ matrix.goarch }}*
+          retention-days: 1
+
+  # Job 2: 合并校验和
+  checksum:
+    name: Generate checksums
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Merge checksums
+        run: |
+          echo "Merging checksums..."
+          cat artifacts/*/*.sha256 > checksums.txt
+          echo "=== checksums.txt ==="
+          cat checksums.txt
+
+      - name: Upload checksums
+        uses: actions/upload-artifact@v4
+        with:
+          name: checksums
+          path: checksums.txt
+          retention-days: 1
+
+  # Job 3: 上传到 Release
+  upload:
+    name: Upload release assets
+    needs: [build, checksum]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare release files
+        run: |
+          mkdir -p release
+
+          # 复制所有二进制文件
+          for dir in artifacts/${{ env.BINARY_NAME }}-*/; do
+            cp "$dir"${{ env.BINARY_NAME }}-* release/ 2>/dev/null || true
+          done
+
+          # 复制合并的校验和文件
+          cp artifacts/checksums/checksums.txt release/
+
+          # 复制安装脚本
+          cp scripts/install.sh release/
+          cp scripts/install.ps1 release/
+          cp scripts/uninstall.sh release/
+          cp scripts/uninstall.ps1 release/
+
+          echo "=== Release files ==="
+          ls -la release/
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Job 4: 更新 Homebrew Tap (可选)
+  update-homebrew:
+    name: Update Homebrew tap
+    needs: upload
+    runs-on: ubuntu-latest
+    if: ${{ vars.HOMEBREW_TAP_ENABLED == 'true' }}
+    steps:
+      - name: Get version
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
+          echo "VERSION_NUM=${VERSION#v}" >> $GITHUB_OUTPUT
+
+      - name: Checkout homebrew-tap
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: homebrew-tap
+
+      - name: Download checksums
+        uses: actions/download-artifact@v4
+        with:
+          name: checksums
+          path: .
+
+      - name: Update formula
+        run: |
+          cd homebrew-tap
+
+          # 获取各平台的 SHA256
+          DARWIN_AMD64_SHA=$(grep 'darwin-amd64' ../checksums.txt | awk '{print $1}')
+          DARWIN_ARM64_SHA=$(grep 'darwin-arm64' ../checksums.txt | awk '{print $1}')
+          LINUX_AMD64_SHA=$(grep 'linux-amd64' ../checksums.txt | awk '{print $1}')
+          LINUX_ARM64_SHA=$(grep 'linux-arm64' ../checksums.txt | awk '{print $1}')
+
+          VERSION="${{ steps.version.outputs.VERSION_NUM }}"
+
+          # 创建 Formula 目录
+          mkdir -p Formula
+
+          # 生成 Formula
+          cat > Formula/${{ env.BINARY_NAME }}.rb << EOF
+          class Xbuilder < Formula
+            desc "CLI tool for building and deploying applications with pipeline support"
+            homepage "https://github.com/${{ github.repository }}"
+            version "${VERSION}"
+            license "MIT"
+
+            on_macos do
+              if Hardware::CPU.arm?
+                url "https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.VERSION }}/${{ env.BINARY_NAME }}-darwin-arm64"
+                sha256 "${DARWIN_ARM64_SHA}"
+              else
+                url "https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.VERSION }}/${{ env.BINARY_NAME }}-darwin-amd64"
+                sha256 "${DARWIN_AMD64_SHA}"
+              end
+            end
+
+            on_linux do
+              if Hardware::CPU.arm?
+                url "https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.VERSION }}/${{ env.BINARY_NAME }}-linux-arm64"
+                sha256 "${LINUX_ARM64_SHA}"
+              else
+                url "https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.VERSION }}/${{ env.BINARY_NAME }}-linux-amd64"
+                sha256 "${LINUX_AMD64_SHA}"
+              end
+            end
+
+            def install
+              binary_name = "${{ env.BINARY_NAME }}"
+              if OS.mac?
+                if Hardware::CPU.arm?
+                  bin.install "${{ env.BINARY_NAME }}-darwin-arm64" => binary_name
+                else
+                  bin.install "${{ env.BINARY_NAME }}-darwin-amd64" => binary_name
+                end
+              elsif OS.linux?
+                if Hardware::CPU.arm?
+                  bin.install "${{ env.BINARY_NAME }}-linux-arm64" => binary_name
+                else
+                  bin.install "${{ env.BINARY_NAME }}-linux-amd64" => binary_name
+                end
+              end
+            end
+
+            test do
+              system "#{bin}/${{ env.BINARY_NAME }}", "--version"
+            end
+          end
+          EOF
+
+          echo "Formula created:"
+          cat Formula/${{ env.BINARY_NAME }}.rb
+
+      - name: Commit and push
+        run: |
+          cd homebrew-tap
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .
+          git commit -m "Update ${{ env.BINARY_NAME }} to ${{ steps.version.outputs.VERSION }}" || echo "No changes to commit"
+          git push

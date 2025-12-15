@@ -1,8 +1,8 @@
 package version
 
-// Version 版本信息
-const (
-	Version   = "1.0.0"
+// 版本信息变量 (可通过 -ldflags 注入)
+var (
+	Version   = "dev"
 	BuildDate = ""
 	GitCommit = ""
 )
