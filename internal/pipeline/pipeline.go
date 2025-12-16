@@ -14,19 +14,21 @@ import (
 
 // Pipeline 流水线编排器
 type Pipeline struct {
-	config      *config.Config
-	stages      []*Stage
-	program     *tea.Program // 用于向 TUI 发送消息
-	builtImages []string     // 记录已构建的镜像
-	mu          sync.RWMutex
+	config       *config.Config
+	stages       []*Stage
+	program      *tea.Program    // 用于向 TUI 发送消息
+	builtImages  []string        // 记录已构建的镜像
+	pushedImages map[string]bool // 记录已推送的镜像
+	mu           sync.RWMutex
 }
 
 // New 创建新的流水线
 func New(cfg *config.Config) *Pipeline {
 	p := &Pipeline{
-		config:      cfg,
-		stages:      make([]*Stage, 0, len(cfg.Pipeline)),
-		builtImages: make([]string, 0),
+		config:       cfg,
+		stages:       make([]*Stage, 0, len(cfg.Pipeline)),
+		builtImages:  make([]string, 0),
+		pushedImages: make(map[string]bool),
 	}
 
 	// 创建阶段
@@ -165,8 +167,13 @@ func (p *Pipeline) runTask(ctx context.Context, task *Task) error {
 	// 记录构建的镜像（用于 docker push）
 	if task.Type == config.TaskTypeDockerBuild {
 		if dockerExec, ok := exec.(*executor.DockerBuildExecutor); ok {
+			imageName := dockerExec.FullImageName()
 			p.mu.Lock()
-			p.builtImages = append(p.builtImages, dockerExec.FullImageName())
+			p.builtImages = append(p.builtImages, imageName)
+			// 记录是否已在构建阶段推送
+			if dockerExec.IsPushed() {
+				p.pushedImages[imageName] = true
+			}
 			p.mu.Unlock()
 		}
 	}
@@ -199,6 +206,8 @@ func (p *Pipeline) createExecutor(task *Task) (executor.Executor, error) {
 		if task.Config.Auto {
 			p.mu.RLock()
 			exec.SetImages(p.builtImages)
+			// 传递已推送的镜像状态，让 push 执行器跳过这些镜像
+			exec.SetSkipPushedImages(p.pushedImages)
 			p.mu.RUnlock()
 		}
 

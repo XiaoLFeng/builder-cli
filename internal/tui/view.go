@@ -100,15 +100,17 @@ func (m *Model) renderInitView() string {
 func (m *Model) renderRunningView() string {
 	var b strings.Builder
 
-	// 实时日志终端（顶部）
-	b.WriteString(m.terminal.RenderWithTitle("实时日志"))
-	b.WriteString("\n\n")
+	// 实时日志终端（仅当空间足够时显示）
+	if m.shouldShowTerminal() {
+		b.WriteString(m.terminal.RenderWithTitle("实时日志"))
+		b.WriteString("\n\n")
+	}
 
-	// 进度条
+	// 进度条（始终显示）
 	b.WriteString(m.progressBar.RenderWithTitle("Overall Progress"))
 	b.WriteString("\n\n")
 
-	// 任务列表（底部）
+	// 任务列表（始终显示）
 	b.WriteString(m.todoList.RenderWithTitle("任务队列", m.width-2))
 
 	return b.String()

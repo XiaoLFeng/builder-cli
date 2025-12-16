@@ -14,24 +14,37 @@ import (
 // DockerBuildExecutor Docker 构建执行器
 type DockerBuildExecutor struct {
 	*BaseExecutor
-	dockerfile string
-	context    string
-	imageName  string
-	tag        string
-	buildArgs  map[string]string
-	platforms  []string // 多平台支持
+	dockerfile        string
+	context           string
+	imageName         string
+	tag               string
+	buildArgs         map[string]string
+	platforms         []string // 多平台支持
+	pushOnBuild       bool     // 多平台构建时是否自动推送
+	pushLatestOnBuild bool     // 多平台构建时是否同时推送 latest 标签
+	pushed            bool     // 记录镜像是否已推送
+	pushedLatest      bool     // 记录 latest 标签是否已推送
 }
 
 // NewDockerBuildExecutor 创建 Docker 构建执行器
 func NewDockerBuildExecutor(taskName string, cfg config.TaskConfig) *DockerBuildExecutor {
 	e := &DockerBuildExecutor{
-		BaseExecutor: NewBaseExecutor(taskName, TypeDockerBuild),
-		dockerfile:   cfg.Dockerfile,
-		context:      cfg.Context,
-		imageName:    cfg.ImageName,
-		tag:          cfg.Tag,
-		buildArgs:    cfg.BuildArgs,
-		platforms:    cfg.Platforms,
+		BaseExecutor:      NewBaseExecutor(taskName, TypeDockerBuild),
+		dockerfile:        cfg.Dockerfile,
+		context:           cfg.Context,
+		imageName:         cfg.ImageName,
+		tag:               cfg.Tag,
+		buildArgs:         cfg.BuildArgs,
+		platforms:         cfg.Platforms,
+		pushOnBuild:       true, // 默认 true（保持向后兼容）
+		pushLatestOnBuild: cfg.PushLatestOnBuild,
+		pushed:            false,
+		pushedLatest:      false,
+	}
+
+	// 如果配置中明确指定了 push_on_build
+	if cfg.PushOnBuild != nil {
+		e.pushOnBuild = *cfg.PushOnBuild
 	}
 
 	// 默认值
@@ -55,6 +68,21 @@ func NewDockerBuildExecutor(taskName string, cfg config.TaskConfig) *DockerBuild
 // FullImageName 返回完整的镜像名称
 func (e *DockerBuildExecutor) FullImageName() string {
 	return fmt.Sprintf("%s:%s", e.imageName, e.tag)
+}
+
+// IsPushed 返回镜像是否已在构建阶段推送
+func (e *DockerBuildExecutor) IsPushed() bool {
+	return e.pushed
+}
+
+// IsPushedLatest 返回 latest 标签是否已在构建阶段推送
+func (e *DockerBuildExecutor) IsPushedLatest() bool {
+	return e.pushedLatest
+}
+
+// LatestImageName 返回 latest 标签的镜像名称
+func (e *DockerBuildExecutor) LatestImageName() string {
+	return fmt.Sprintf("%s:latest", e.imageName)
 }
 
 // Execute 执行 Docker 构建
@@ -86,7 +114,18 @@ func (e *DockerBuildExecutor) Execute(ctx context.Context, handler OutputHandler
 	// 多平台支持
 	if len(e.platforms) > 0 {
 		// 使用 buildx 进行多平台构建
-		args = []string{"buildx", "build", "--push"}
+		args = []string{"buildx", "build"}
+
+		// 根据配置决定是否在构建时推送
+		if e.pushOnBuild {
+			args = append(args, "--push")
+			e.pushed = true
+			handler("ℹ️  [INFO] 多平台构建将直接推送镜像", false)
+		} else {
+			// 不推送，但镜像也不会存在于本地（buildx 限制）
+			args = append(args, "--output", "type=image,push=false")
+			handler("⚠️  [WARN] 多平台构建未启用推送，镜像不会保存到本地", false)
+		}
 
 		// Dockerfile 路径
 		if e.dockerfile != "" {
@@ -95,6 +134,13 @@ func (e *DockerBuildExecutor) Execute(ctx context.Context, handler OutputHandler
 
 		// 镜像标签
 		args = append(args, "-t", e.FullImageName())
+
+		// 如果需要同时推送 latest 标签且当前标签不是 latest
+		if e.pushOnBuild && e.pushLatestOnBuild && e.tag != "latest" {
+			args = append(args, "-t", e.LatestImageName())
+			e.pushedLatest = true
+			handler(fmt.Sprintf("ℹ️  [INFO] 同时推送 latest 标签: %s", e.LatestImageName()), false)
+		}
 
 		// 构建参数
 		for k, v := range e.buildArgs {
@@ -124,7 +170,8 @@ type DockerPushExecutor struct {
 	*BaseExecutor
 	registry   *config.Registry
 	images     []string
-	pushLatest bool // 是否同时推送 latest 标签
+	pushLatest bool            // 是否同时推送 latest 标签
+	skipPushed map[string]bool // 需要跳过的已推送镜像
 }
 
 // NewDockerPushExecutor 创建 Docker 推送执行器
@@ -134,6 +181,7 @@ func NewDockerPushExecutor(taskName string, cfg config.TaskConfig, registry *con
 		registry:     registry,
 		images:       cfg.Images,
 		pushLatest:   cfg.PushLatest,
+		skipPushed:   nil,
 	}
 
 	// 设置超时
@@ -151,6 +199,11 @@ func (e *DockerPushExecutor) SetImages(images []string) {
 	e.images = images
 }
 
+// SetSkipPushedImages 设置已推送的镜像（这些将被跳过）
+func (e *DockerPushExecutor) SetSkipPushedImages(pushed map[string]bool) {
+	e.skipPushed = pushed
+}
+
 // Execute 执行 Docker 推送
 func (e *DockerPushExecutor) Execute(ctx context.Context, handler OutputHandler) error {
 	// 登录 Registry
@@ -162,6 +215,12 @@ func (e *DockerPushExecutor) Execute(ctx context.Context, handler OutputHandler)
 
 	// 推送每个镜像
 	for _, image := range e.images {
+		// 检查是否已在构建阶段推送（跳过）
+		if e.skipPushed != nil && e.skipPushed[image] {
+			handler(fmt.Sprintf("⏭️  [SKIP] 镜像已在构建阶段推送，跳过: %s", image), false)
+			continue
+		}
+
 		// 推送原始标签
 		handler(fmt.Sprintf("📤 推送镜像: %s", image), false)
 

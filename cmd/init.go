@@ -6,39 +6,8 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/cobra"
+	"github.com/xiaolfeng/builder-cli/resources"
 )
-
-// 最小配置文件模板
-const minimalConfigTemplate = `# xbuilder 配置文件
-# 完整示例请运行: xbuilder gen
-
-version: "1.0"
-
-project:
-  name: "my-project"
-
-pipeline:
-  # Maven 构建
-  - stage: "build"
-    name: "构建"
-    tasks:
-      - name: "Maven 打包"
-        type: "maven"
-        config:
-          command: "mvn clean package -DskipTests"
-
-  # Docker 构建
-  - stage: "docker"
-    name: "Docker 构建"
-    tasks:
-      - name: "构建镜像"
-        type: "docker-build"
-        config:
-          dockerfile: "./Dockerfile"
-          context: "."
-          image_name: "my-project"
-          tag: "latest"
-`
 
 var (
 	initForce bool
@@ -51,7 +20,7 @@ var initCmd = &cobra.Command{
 	Long: `初始化一个最小的 xbuilder.yaml 配置文件。
 
 该配置文件只包含最基础的 Maven 构建和 Docker 构建配置，
-适合快速开始使用。如需完整模板，请使用 'xbuilder gen' 命令。`,
+适合快速开始使用。如需完整模板，请使用 'xbuilder gen config' 命令。`,
 	Example: `  xbuilder init          # 在当前目录创建 xbuilder.yaml
   xbuilder init -f       # 强制覆盖已存在的配置文件`,
 	RunE: runInit,
@@ -73,8 +42,14 @@ func runInit(cmd *cobra.Command, args []string) error {
 		fmt.Printf("⚠️  覆盖已存在的配置文件: %s\n", configPath)
 	}
 
+	// 从 embed 读取模板
+	content, err := resources.GetTemplate("config/minimal.yaml")
+	if err != nil {
+		return fmt.Errorf("读取模板失败: %w", err)
+	}
+
 	// 写入配置文件
-	if err := os.WriteFile(configPath, []byte(minimalConfigTemplate), 0644); err != nil {
+	if err := os.WriteFile(configPath, content, 0644); err != nil {
 		return fmt.Errorf("创建配置文件失败: %w", err)
 	}
 
@@ -85,7 +60,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 	fmt.Println("  1. 编辑 xbuilder.yaml 配置你的构建流程")
 	fmt.Println("  2. 运行 'xbuilder build' 开始构建")
 	fmt.Println()
-	fmt.Println("提示: 运行 'xbuilder gen' 可生成完整的配置模板和示例脚本")
+	fmt.Println("提示: 运行 'xbuilder gen config' 可生成完整的配置模板和示例脚本")
 
 	return nil
 }

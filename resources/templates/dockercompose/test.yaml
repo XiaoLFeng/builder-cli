@@ -1,0 +1,89 @@
+# xbuilder docker-compose 示例 - 测试环境
+# 资源限制、健康检查、适合 CI/CD 测试
+name: ${PROJECT_NAME:-app}-test
+services:
+  # ─────────────────────────────────────────────────────────────
+  # 应用服务
+  # ─────────────────────────────────────────────────────────────
+  app:
+    image: ${REGISTRY_PREFIX:-my-project}/${IMAGE_NAME:-app}:${APP_VERSION:-test}
+    container_name: ${PROJECT_NAME:-app}-test
+    restart: "no"
+    ports:
+      - "8080:8080"
+    environment:
+      - ENV=test
+      - DEBUG=false
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=${DB_NAME:-app_test}
+      - DB_USER=${DB_USER:-postgres}
+      - DB_PASSWORD=${DB_PASSWORD:-postgres}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - test-network
+
+  # ─────────────────────────────────────────────────────────────
+  # PostgreSQL 数据库 (测试用)
+  # ─────────────────────────────────────────────────────────────
+  db:
+    image: postgres:15-alpine
+    container_name: ${PROJECT_NAME:-app}-db-test
+    restart: "no"
+    environment:
+      - POSTGRES_DB=${DB_NAME:-app_test}
+      - POSTGRES_USER=${DB_USER:-postgres}
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-postgres}
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    tmpfs:
+      - /var/lib/postgresql/data  # 使用内存存储，测试后自动清理
+    networks:
+      - test-network
+
+  # ─────────────────────────────────────────────────────────────
+  # Redis 缓存 (测试用)
+  # ─────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: ${PROJECT_NAME:-app}-redis-test
+    restart: "no"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 64M
+    networks:
+      - test-network
+
+networks:
+  test-network:
+    driver: bridge

@@ -276,9 +276,11 @@ func (m *Model) updateComponentSizes() {
 	todoHeight := min(len(m.todoList.GetTasks())+2, 8)
 	m.todoList.SetSize(m.width-4, todoHeight)
 
-	// Terminal 终端区域（顶部主要显示区）
+	// Terminal 终端区域（仅当需要显示时设置尺寸）
 	terminalHeight := m.getTerminalHeight()
-	m.terminal.SetSize(m.width-4, terminalHeight)
+	if terminalHeight > 0 {
+		m.terminal.SetSize(m.width-4, terminalHeight)
+	}
 
 	// 进度条
 	m.progressBar.SetSize(m.width - 8)
@@ -295,6 +297,7 @@ func (m *Model) updateComponentSizes() {
 }
 
 // getTerminalHeight 获取终端区域高度
+// 返回 0 表示空间不足，应隐藏实时日志区域
 func (m Model) getTerminalHeight() int {
 	// 计算 todoList 实际高度（压缩后）
 	todoHeight := min(len(m.todoList.GetTasks())+2, 8)
@@ -303,14 +306,21 @@ func (m Model) getTerminalHeight() int {
 	usedHeight := 3 + 2 + 4 + todoHeight + 2 + 4
 	availableHeight := m.height - usedHeight
 
-	// 限制终端高度范围：最小 6 行，最大 18 行
-	if availableHeight < 6 {
-		availableHeight = 6
+	// 如果可用高度低于 8，返回 0 表示隐藏实时日志
+	if availableHeight < 8 {
+		return 0
 	}
+
+	// 限制最大高度为 18 行
 	if availableHeight > 18 {
 		availableHeight = 18
 	}
 	return availableHeight
+}
+
+// shouldShowTerminal 判断是否应该显示实时日志区域
+func (m Model) shouldShowTerminal() bool {
+	return m.getTerminalHeight() > 0
 }
 
 // getCardWidth 获取卡片宽度

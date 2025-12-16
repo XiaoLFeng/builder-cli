@@ -67,13 +67,15 @@ type TaskConfig struct {
 	Script  string `yaml:"script,omitempty"`
 
 	// Docker Build 配置
-	Dockerfile string            `yaml:"dockerfile,omitempty"`
-	Context    string            `yaml:"context,omitempty"`
-	ImageName  string            `yaml:"image_name,omitempty"`
-	Tag        string            `yaml:"tag,omitempty"`
-	BuildArgs  map[string]string `yaml:"build_args,omitempty"`
-	Platforms  []string          `yaml:"platforms,omitempty"` // 多平台构建，如 ["linux/amd64", "linux/arm64"]
-	AutoScan   *AutoScanConfig   `yaml:"auto_scan,omitempty"`
+	Dockerfile        string            `yaml:"dockerfile,omitempty"`
+	Context           string            `yaml:"context,omitempty"`
+	ImageName         string            `yaml:"image_name,omitempty"`
+	Tag               string            `yaml:"tag,omitempty"`
+	BuildArgs         map[string]string `yaml:"build_args,omitempty"`
+	Platforms         []string          `yaml:"platforms,omitempty"`            // 多平台构建，如 ["linux/amd64", "linux/arm64"]
+	PushOnBuild       *bool             `yaml:"push_on_build,omitempty"`        // 多平台构建时是否自动推送 (默认 true)
+	PushLatestOnBuild bool              `yaml:"push_latest_on_build,omitempty"` // 多平台构建时是否同时推送 latest 标签
+	AutoScan          *AutoScanConfig   `yaml:"auto_scan,omitempty"`
 
 	// Docker Push 配置
 	Registry   string   `yaml:"registry,omitempty"`
