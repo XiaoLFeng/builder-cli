@@ -6,6 +6,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/xiaolfeng/builder-cli/internal/tui/components/taskcard"
+	"github.com/xiaolfeng/builder-cli/pkg/version"
 )
 
 // View 实现 tea.Model 接口
@@ -51,13 +52,20 @@ func (m *Model) View() string {
 func (m *Model) renderHeader() string {
 	// 左侧：应用名称
 	title := AppTitleStyle.Render("⚡ xbuilder")
-	version := VersionStyle.Render(" v1.0.0")
+	ver := version.Version
+	if ver == "" {
+		ver = "dev"
+	}
+	if !strings.HasPrefix(ver, "v") {
+		ver = "v" + ver
+	}
+	versionText := VersionStyle.Render(" " + ver)
 
 	// 右侧：帮助提示
 	help := HelpStyle.Render("[q] 退出  [?] 帮助")
 
 	// 计算间距
-	leftPart := title + version
+	leftPart := title + versionText
 	rightPart := help
 	spacing := m.width - lipgloss.Width(leftPart) - lipgloss.Width(rightPart) - 2
 

@@ -16,8 +16,7 @@ var (
 	// 标题样式
 	titleStyle = lipgloss.NewStyle().
 			Bold(true).
-			Foreground(styles.TextColor).
-			MarginBottom(1)
+			Foreground(styles.TextColor)
 )
 
 // RenderWithTitle 带标题渲染
@@ -28,5 +27,9 @@ func (m Model) RenderWithTitle(title string, width int) string {
 	content += "\n"
 	content += m.View()
 
-	return containerStyle.Width(width - 2).Render(content)
+	style := containerStyle.Width(width - 2)
+	if m.height > 0 {
+		style = style.Height(m.height)
+	}
+	return style.Render(content)
 }

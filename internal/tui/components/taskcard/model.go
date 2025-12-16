@@ -142,9 +142,6 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
-	case tea.WindowSizeMsg:
-		m.SetSize(msg.Width, msg.Height)
-
 	case types.OutputMsg:
 		if msg.TaskID == m.taskID {
 			m.AppendOutput(msg.Line, msg.IsError)

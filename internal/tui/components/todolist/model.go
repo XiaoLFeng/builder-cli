@@ -55,9 +55,11 @@ func (m Model) WithTasks(tasks []Task) Model {
 func (m *Model) SetSize(width, height int) {
 	m.width = width
 	m.height = height
-	// 根据高度计算可显示的任务数
-	if height > 4 {
-		m.maxVisible = (height - 4) // 减去标题和边框
+	// 根据高度计算可显示的任务数（减去标题和边框）
+	// 保底至少 1 行，避免小窗口时 maxVisible 维持默认值导致内容溢出
+	m.maxVisible = height - 4
+	if m.maxVisible < 1 {
+		m.maxVisible = 1
 	}
 }
 
@@ -106,9 +108,6 @@ func (m Model) Init() tea.Cmd {
 // Update 实现 tea.Model 接口
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.WindowSizeMsg:
-		m.SetSize(msg.Width, msg.Height)
-
 	case types.TaskStatusMsg:
 		m.UpdateTaskStatus(msg.TaskID, msg.Status)
 	}

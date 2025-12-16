@@ -73,9 +73,7 @@ func (m Model) Init() tea.Cmd {
 
 // Update 实现 tea.Model 接口
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.WindowSizeMsg:
-		m.SetSize(msg.Width)
+	switch msg.(type) {
 	case tickMsg:
 		if m.isRunning {
 			m.currentTime = time.Now()

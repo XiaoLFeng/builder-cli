@@ -272,8 +272,8 @@ func (m *Model) handleTaskProgressMsg(msg TaskProgressMsg) {
 
 // updateComponentSizes 更新组件尺寸
 func (m *Model) updateComponentSizes() {
-	// TodoList 高度（压缩：最多显示 6 行任务）
-	todoHeight := min(len(m.todoList.GetTasks())+2, 8)
+	// TodoList 高度（根据终端高度做自适应，避免挤压头部/底部区域）
+	todoHeight := m.getTodoHeight()
 	m.todoList.SetSize(m.width-4, todoHeight)
 
 	// Terminal 终端区域（仅当需要显示时设置尺寸）
@@ -296,25 +296,50 @@ func (m *Model) updateComponentSizes() {
 	}
 }
 
+// getTodoHeight 获取任务队列区域高度（外框高度）
+func (m Model) getTodoHeight() int {
+	// 期望高度：任务数 + 标题/边框占用（最多 8 行）
+	desired := min(len(m.todoList.GetTasks())+2, 8)
+
+	// 运行态 UI（不含实时日志）固定占用：
+	// 标题栏+分隔线+空行(3) + 进度条(2) + 间距(1) + 底部分隔线+状态栏(2) = 8
+	maxFit := m.height - 8
+	if maxFit < 0 {
+		maxFit = 0
+	}
+	if desired > maxFit {
+		desired = maxFit
+	}
+
+	// 保底高度：尽量保证能显示标题+至少一行内容（边框 2 + 标题 1 + 内容 1 = 4）
+	if desired > 0 && desired < 4 {
+		desired = min(4, maxFit)
+	}
+
+	return desired
+}
+
 // getTerminalHeight 获取终端区域高度
 // 返回 0 表示空间不足，应隐藏实时日志区域
 func (m Model) getTerminalHeight() int {
-	// 计算 todoList 实际高度（压缩后）
-	todoHeight := min(len(m.todoList.GetTasks())+2, 8)
+	todoHeight := m.getTodoHeight()
 
-	// 预留空间：标题(3) + 分隔线(2) + 进度条(4) + todoList + 状态栏(2) + 边距(4)
-	usedHeight := 3 + 2 + 4 + todoHeight + 2 + 4
-	availableHeight := m.height - usedHeight
+	// 固定占用（不含日志框本体）：
+	// 标题栏+分隔线+空行(3)
+	// + 日志标题(1)
+	// + 日志与进度条间距(1)
+	// + 进度条(2)
+	// + 进度条与任务队列间距(1)
+	// + 任务队列(todoHeight)
+	// + 底部分隔线+状态栏(2)
+	fixed := 3 + 1 + 1 + 2 + 1 + todoHeight + 2
+	availableHeight := m.height - fixed
 
-	// 如果可用高度低于 8，返回 0 表示隐藏实时日志
+	// 低于 8 行时隐藏（避免 viewport 最小高度修正导致反向溢出）
 	if availableHeight < 8 {
 		return 0
 	}
 
-	// 限制最大高度为 18 行
-	if availableHeight > 18 {
-		availableHeight = 18
-	}
 	return availableHeight
 }
 
