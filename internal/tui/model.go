@@ -143,6 +143,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.ensureTaskCard(msg.TaskID)
 		// 注意：实际的输出追加由 taskCard.Update 处理，避免重复
 
+	case OutputBatchMsg:
+		// 确保 taskCard 存在（首次输出时创建）
+		m.ensureTaskCard(msg.TaskID)
+
 	case TaskStatusMsg:
 		m.handleTaskStatusMsg(msg)
 

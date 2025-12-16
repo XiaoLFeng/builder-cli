@@ -77,6 +77,18 @@ type OutputMsg struct {
 	IsError bool
 }
 
+// OutputLine 批量输出中的单行
+type OutputLine struct {
+	Line    string
+	IsError bool
+}
+
+// OutputBatchMsg 任务输出消息（批量，用于降低刷新频率）
+type OutputBatchMsg struct {
+	TaskID string
+	Lines  []OutputLine
+}
+
 // TaskStatusMsg 任务状态变更消息
 type TaskStatusMsg struct {
 	TaskID string
@@ -129,6 +141,11 @@ type TickMsg time.Time
 // NewOutputMsg 创建输出消息
 func NewOutputMsg(taskID, line string, isError bool) OutputMsg {
 	return OutputMsg{TaskID: taskID, Line: line, IsError: isError}
+}
+
+// NewOutputBatchMsg 创建批量输出消息
+func NewOutputBatchMsg(taskID string, lines []OutputLine) OutputBatchMsg {
+	return OutputBatchMsg{TaskID: taskID, Lines: lines}
 }
 
 // NewTaskStatusMsg 创建任务状态消息

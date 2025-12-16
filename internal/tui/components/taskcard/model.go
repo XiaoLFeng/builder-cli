@@ -104,6 +104,30 @@ func (m *Model) AppendOutput(line string, isError bool) {
 	m.viewport.GotoBottom()
 }
 
+// AppendOutputs 批量追加输出内容
+func (m *Model) AppendOutputs(lines []types.OutputLine) {
+	if len(lines) == 0 {
+		return
+	}
+
+	for _, l := range lines {
+		line := l.Line
+		if l.IsError {
+			line = styles.ErrorTextStyle.Render(line)
+		}
+		m.outputLines = append(m.outputLines, line)
+	}
+
+	// 限制行数
+	if len(m.outputLines) > m.maxLines {
+		m.outputLines = m.outputLines[len(m.outputLines)-m.maxLines:]
+	}
+
+	// 更新 viewport 内容
+	m.viewport.SetContent(strings.Join(m.outputLines, "\n"))
+	m.viewport.GotoBottom()
+}
+
 // ClearOutput 清空输出
 func (m *Model) ClearOutput() {
 	m.outputLines = make([]string, 0)
@@ -145,6 +169,11 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	case types.OutputMsg:
 		if msg.TaskID == m.taskID {
 			m.AppendOutput(msg.Line, msg.IsError)
+		}
+
+	case types.OutputBatchMsg:
+		if msg.TaskID == m.taskID {
+			m.AppendOutputs(msg.Lines)
 		}
 
 	case types.TaskStatusMsg:

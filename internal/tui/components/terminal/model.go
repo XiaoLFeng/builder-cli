@@ -96,6 +96,35 @@ func (m *Model) AppendLog(taskID, line string, isError bool) {
 	m.updateContent()
 }
 
+// AppendLogs 批量追加日志条目
+func (m *Model) AppendLogs(taskID string, lines []types.OutputLine) {
+	if len(lines) == 0 {
+		return
+	}
+
+	taskName := m.taskNames[taskID]
+	if taskName == "" {
+		taskName = taskID
+	}
+
+	for _, l := range lines {
+		m.logEntries = append(m.logEntries, LogEntry{
+			TaskID:   taskID,
+			TaskName: taskName,
+			Line:     l.Line,
+			IsError:  l.IsError,
+		})
+	}
+
+	// 限制日志数量
+	if len(m.logEntries) > m.maxEntries {
+		m.logEntries = m.logEntries[len(m.logEntries)-m.maxEntries:]
+	}
+
+	// 更新 viewport 内容
+	m.updateContent()
+}
+
 // updateContent 更新 viewport 内容
 func (m *Model) updateContent() {
 	if !m.ready {
@@ -171,6 +200,9 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case types.OutputMsg:
 		m.AppendLog(msg.TaskID, msg.Line, msg.IsError)
+
+	case types.OutputBatchMsg:
+		m.AppendLogs(msg.TaskID, msg.Lines)
 
 	case tea.KeyMsg:
 		// 支持 viewport 滚动

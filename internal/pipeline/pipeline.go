@@ -144,10 +144,9 @@ func (p *Pipeline) runTask(ctx context.Context, task *Task) error {
 	// 发送任务开始消息
 	p.sendMsg(types.NewTaskStatusMsg(task.ID, types.StatusRunning))
 
-	// 创建输出处理器
-	handler := func(line string, isError bool) {
-		p.sendMsg(types.NewOutputMsg(task.ID, line, isError))
-	}
+	// 创建输出处理器（必要时做降级，减少刷新频率）
+	handler, flush := p.newTaskOutputHandler(task)
+	defer flush()
 
 	// 获取执行器
 	exec, err := p.createExecutor(task)
@@ -159,10 +158,13 @@ func (p *Pipeline) runTask(ctx context.Context, task *Task) error {
 
 	// 执行任务
 	if err := exec.Execute(ctx, handler); err != nil {
+		flush()
 		p.sendMsg(types.NewTaskStatusMsg(task.ID, types.StatusFailed))
 		p.sendMsg(types.NewErrorMsg(task.ID, err, "任务执行失败"))
 		return err
 	}
+
+	flush()
 
 	// 记录构建的镜像（用于 docker push）
 	if task.Type == config.TaskTypeDockerBuild {

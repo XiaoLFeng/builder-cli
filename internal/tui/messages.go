@@ -8,6 +8,8 @@ import (
 type (
 	TaskStatus          = types.TaskStatus
 	OutputMsg           = types.OutputMsg
+	OutputLine          = types.OutputLine
+	OutputBatchMsg      = types.OutputBatchMsg
 	TaskStatusMsg       = types.TaskStatusMsg
 	TaskProgressMsg     = types.TaskProgressMsg
 	StageStartMsg       = types.StageStartMsg
@@ -50,6 +52,7 @@ func StatusIcon(s types.TaskStatus) string {
 // 重新导出构造函数
 var (
 	NewOutputMsg           = types.NewOutputMsg
+	NewOutputBatchMsg      = types.NewOutputBatchMsg
 	NewTaskStatusMsg       = types.NewTaskStatusMsg
 	NewTaskProgressMsg     = types.NewTaskProgressMsg
 	NewStageStartMsg       = types.NewStageStartMsg

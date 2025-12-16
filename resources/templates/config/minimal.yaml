@@ -27,3 +27,5 @@ pipeline:
           context: "."
           image_name: "my-project"
           tag: "latest"
+          # 强制降级刷新（合并日志输出），避免 Docker 构建日志刷屏
+          force_refresh: true

@@ -73,6 +73,7 @@ type TaskConfig struct {
 	Tag               string            `yaml:"tag,omitempty"`
 	BuildArgs         map[string]string `yaml:"build_args,omitempty"`
 	Platforms         []string          `yaml:"platforms,omitempty"`            // 多平台构建，如 ["linux/amd64", "linux/arm64"]
+	ForceRefresh      bool              `yaml:"force_refresh,omitempty"`        // Docker 构建日志强制降级刷新（避免刷屏）
 	PushOnBuild       *bool             `yaml:"push_on_build,omitempty"`        // 多平台构建时是否自动推送 (默认 true)
 	PushLatestOnBuild bool              `yaml:"push_latest_on_build,omitempty"` // 多平台构建时是否同时推送 latest 标签
 	AutoScan          *AutoScanConfig   `yaml:"auto_scan,omitempty"`

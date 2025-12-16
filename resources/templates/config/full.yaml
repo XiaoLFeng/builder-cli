@@ -86,6 +86,8 @@ pipeline:
           context: "./user-service"
           image_name: "${REGISTRY_PREFIX}/user-service"
           tag: "${APP_VERSION}"
+          # 强制降级刷新（合并日志输出），避免 Docker 构建日志刷屏
+          force_refresh: true
           build_args:
             JAR_FILE: "target/*.jar"
             BUILD_ENV: "${DEPLOY_ENV}"
@@ -97,6 +99,8 @@ pipeline:
           context: "./order-service"
           image_name: "${REGISTRY_PREFIX}/order-service"
           tag: "${APP_VERSION}"
+          # 强制降级刷新（合并日志输出），避免 Docker 构建日志刷屏
+          force_refresh: true
 
       # 多平台构建示例
       - name: "网关服务镜像 (多平台)"
@@ -106,6 +110,8 @@ pipeline:
           context: "./gateway-service"
           image_name: "${REGISTRY_PREFIX}/gateway-service"
           tag: "${APP_VERSION}"
+          # 强制降级刷新（合并日志输出），避免 Docker 构建日志刷屏
+          force_refresh: true
           # 多平台构建 (需要 docker buildx)
           platforms:
             - "linux/amd64"
@@ -146,6 +152,8 @@ pipeline:
         type: "ssh"
         config:
           server: "production"
+          # 强制降级刷新（合并日志输出），避免 SSH 远程输出刷屏
+          force_refresh: true
           # 方式1: 内联命令
           commands:
             - "cd /opt/services"
