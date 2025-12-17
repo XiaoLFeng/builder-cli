@@ -26,10 +26,15 @@ func (m Model) RenderWithTitle(title string) string {
 
 	// 标题行
 	titleIcon := "💻"
-	titleText := titleStyle.Render(titleIcon + " " + title)
+	taskLabel, pageIdx := m.currentTaskLabel()
+	pageInfo := ""
+	if pageIdx > 0 {
+		pageInfo = titleStyle.Render(fmt.Sprintf(" [%d/%d]", pageIdx, len(m.tasksOrder)))
+	}
+	titleText := titleStyle.Render(titleIcon + " " + title + " · " + taskLabel)
 
 	// 日志数量和滚动状态指示
-	logCountText := countStyle.Render(fmt.Sprintf("[%d lines]", len(m.logEntries)))
+	logCountText := countStyle.Render(fmt.Sprintf("[%d lines]", m.GetLogCount())) + pageInfo
 
 	scrollIndicator := ""
 	if m.autoScroll {

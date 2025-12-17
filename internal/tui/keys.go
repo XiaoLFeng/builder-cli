@@ -16,6 +16,8 @@ type KeyMap struct {
 	PageDown   key.Binding
 	Home       key.Binding
 	End        key.Binding
+	LogPrev    key.Binding
+	LogNext    key.Binding
 }
 
 // DefaultKeyMap 默认快捷键配置
@@ -68,6 +70,14 @@ var DefaultKeyMap = KeyMap{
 		key.WithKeys("end"),
 		key.WithHelp("end", "底部"),
 	),
+	LogPrev: key.NewBinding(
+		key.WithKeys("[", "shift+tab"),
+		key.WithHelp("[/⇧tab", "上一个日志页"),
+	),
+	LogNext: key.NewBinding(
+		key.WithKeys("]", "tab"),
+		key.WithHelp("]/tab", "下一个日志页"),
+	),
 }
 
 // ShortHelp 返回简短帮助信息
@@ -80,6 +90,8 @@ func (k KeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.Up, k.Down, k.Enter},
 		{k.ScrollUp, k.ScrollDown},
+		{k.PageUp, k.PageDown, k.Home, k.End},
+		{k.LogPrev, k.LogNext},
 		{k.Help, k.Quit},
 	}
 }

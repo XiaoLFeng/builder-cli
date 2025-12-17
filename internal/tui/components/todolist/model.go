@@ -61,6 +61,8 @@ func (m *Model) SetSize(width, height int) {
 	if m.maxVisible < 1 {
 		m.maxVisible = 1
 	}
+	// 调整 scrollIndex 以避免越界
+	m.normalizeScroll()
 }
 
 // GetTasks 获取任务列表
@@ -84,6 +86,8 @@ func (m *Model) UpdateTaskStatus(taskID string, status types.TaskStatus) {
 			if status == types.StatusSuccess || status == types.StatusFailed {
 				m.tasks[i].EndTime = time.Now()
 			}
+			// 确保最新变化的任务出现在可视区域
+			m.ensureVisibleIndex(i)
 			break
 		}
 	}
@@ -98,6 +102,45 @@ func (m Model) GetProgress() (completed, total int) {
 		}
 	}
 	return
+}
+
+// EnsureVisible 将指定任务滚动到可视区域
+func (m *Model) EnsureVisible(taskID string) {
+	for i := range m.tasks {
+		if m.tasks[i].ID == taskID {
+			m.ensureVisibleIndex(i)
+			return
+		}
+	}
+}
+
+// ensureVisibleIndex 滚动窗口以包含指定下标
+func (m *Model) ensureVisibleIndex(idx int) {
+	if m.maxVisible <= 0 {
+		return
+	}
+	start := m.scrollIndex
+	end := start + m.maxVisible
+	if idx < start {
+		m.scrollIndex = idx
+	} else if idx >= end {
+		m.scrollIndex = idx - m.maxVisible + 1
+	}
+	m.normalizeScroll()
+}
+
+// normalizeScroll 约束 scrollIndex 边界
+func (m *Model) normalizeScroll() {
+	maxStart := len(m.tasks) - m.maxVisible
+	if maxStart < 0 {
+		maxStart = 0
+	}
+	if m.scrollIndex > maxStart {
+		m.scrollIndex = maxStart
+	}
+	if m.scrollIndex < 0 {
+		m.scrollIndex = 0
+	}
 }
 
 // Init 实现 tea.Model 接口

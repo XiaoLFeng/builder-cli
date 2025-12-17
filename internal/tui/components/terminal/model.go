@@ -5,6 +5,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/muesli/reflow/wordwrap"
 	"github.com/xiaolfeng/builder-cli/internal/types"
 )
 
@@ -26,6 +27,8 @@ type Model struct {
 	ready      bool
 	autoScroll bool
 	taskNames  map[string]string // taskID -> taskName 映射
+	tasksOrder []string          // 任务顺序，用于分页切换
+	selected   string            // 当前选中的任务ID，空字符串表示全部
 }
 
 // New 创建新的终端组件
@@ -35,6 +38,7 @@ func New() Model {
 		maxEntries: 500, // 最多保留 500 行日志
 		autoScroll: true,
 		taskNames:  make(map[string]string),
+		tasksOrder: make([]string, 0),
 	}
 }
 
@@ -69,6 +73,12 @@ func (m *Model) SetSize(width, height int) {
 // RegisterTask 注册任务名称映射
 func (m *Model) RegisterTask(taskID, taskName string) {
 	m.taskNames[taskID] = taskName
+	for _, id := range m.tasksOrder {
+		if id == taskID {
+			return
+		}
+	}
+	m.tasksOrder = append(m.tasksOrder, taskID)
 }
 
 // AppendLog 追加日志条目
@@ -131,10 +141,18 @@ func (m *Model) updateContent() {
 		return
 	}
 
+	entries := m.visibleEntries()
+
 	var lines []string
-	for _, entry := range m.logEntries {
+	wrapWidth := m.viewport.Width
+	if wrapWidth < 10 {
+		wrapWidth = 10
+	}
+
+	for _, entry := range entries {
 		line := m.formatLogEntry(entry)
-		lines = append(lines, line)
+		wrapped := wordwrap.String(line, wrapWidth)
+		lines = append(lines, strings.Split(wrapped, "\n")...)
 	}
 
 	m.viewport.SetContent(strings.Join(lines, "\n"))
@@ -142,6 +160,20 @@ func (m *Model) updateContent() {
 	if m.autoScroll {
 		m.viewport.GotoBottom()
 	}
+}
+
+// visibleEntries 根据选中任务过滤日志
+func (m Model) visibleEntries() []LogEntry {
+	if m.selected == "" {
+		return m.logEntries
+	}
+	var result []LogEntry
+	for _, e := range m.logEntries {
+		if e.TaskID == m.selected {
+			result = append(result, e)
+		}
+	}
+	return result
 }
 
 // formatLogEntry 格式化日志条目
@@ -185,7 +217,62 @@ func (m Model) IsAutoScroll() bool {
 
 // GetLogCount 获取日志数量
 func (m Model) GetLogCount() int {
-	return len(m.logEntries)
+	return len(m.visibleEntries())
+}
+
+// NextTask 切换到下一个任务日志页
+func (m *Model) NextTask() {
+	if len(m.tasksOrder) == 0 {
+		return
+	}
+	if m.selected == "" {
+		m.selected = m.tasksOrder[0]
+	} else {
+		for i, id := range m.tasksOrder {
+			if id == m.selected {
+				m.selected = m.tasksOrder[(i+1)%len(m.tasksOrder)]
+				break
+			}
+		}
+	}
+	m.autoScroll = true
+	m.updateContent()
+}
+
+// PrevTask 切换到上一个任务日志页
+func (m *Model) PrevTask() {
+	if len(m.tasksOrder) == 0 {
+		return
+	}
+	if m.selected == "" {
+		m.selected = m.tasksOrder[len(m.tasksOrder)-1]
+	} else {
+		for i, id := range m.tasksOrder {
+			if id == m.selected {
+				m.selected = m.tasksOrder[(i-1+len(m.tasksOrder))%len(m.tasksOrder)]
+				break
+			}
+		}
+	}
+	m.autoScroll = true
+	m.updateContent()
+}
+
+// currentTaskLabel 返回当前页签文本与序号
+func (m Model) currentTaskLabel() (string, int) {
+	if m.selected == "" {
+		return "全部", 0
+	}
+	name := m.taskNames[m.selected]
+	if name == "" {
+		name = m.selected
+	}
+	for i, id := range m.tasksOrder {
+		if id == m.selected {
+			return name, i + 1
+		}
+	}
+	return name, 0
 }
 
 // Init 实现 tea.Model 接口

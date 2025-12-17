@@ -228,6 +228,13 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 		if m.state == StateInit {
 			return func() tea.Msg { return startPipelineMsg{} }
 		}
+
+	case key.Matches(msg, m.keys.LogNext):
+		m.terminal.NextTask()
+		return nil
+	case key.Matches(msg, m.keys.LogPrev):
+		m.terminal.PrevTask()
+		return nil
 	}
 
 	// 已完成状态下，任意键直接退出，避免卡住非交互环境
@@ -259,6 +266,7 @@ func (m *Model) ensureTaskCard(taskID string) {
 // handleTaskStatusMsg 处理任务状态消息
 func (m *Model) handleTaskStatusMsg(msg TaskStatusMsg) tea.Cmd {
 	m.todoList.UpdateTaskStatus(msg.TaskID, msg.Status)
+	m.todoList.EnsureVisible(msg.TaskID)
 
 	// 更新进度
 	completed, total := m.todoList.GetProgress()
