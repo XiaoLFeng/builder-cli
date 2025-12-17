@@ -77,6 +77,7 @@ func (l *Loader) replaceInPipeline(stages []Stage, vars map[string]string) {
 	for i := range stages {
 		for j := range stages[i].Tasks {
 			task := &stages[i].Tasks[j]
+			task.Config.WorkingDir = l.expandVars(task.Config.WorkingDir, vars)
 			task.Config.Command = l.expandVars(task.Config.Command, vars)
 			task.Config.Script = l.expandVars(task.Config.Script, vars)
 			task.Config.Dockerfile = l.expandVars(task.Config.Dockerfile, vars)
@@ -85,6 +86,16 @@ func (l *Loader) replaceInPipeline(stages []Stage, vars map[string]string) {
 			task.Config.Tag = l.expandVars(task.Config.Tag, vars)
 			task.Config.Registry = l.expandVars(task.Config.Registry, vars)
 			task.Config.LocalScript = l.expandVars(task.Config.LocalScript, vars)
+			task.Config.GoCommand = l.expandVars(task.Config.GoCommand, vars)
+			task.Config.GoOS = l.expandVars(task.Config.GoOS, vars)
+			task.Config.GoArch = l.expandVars(task.Config.GoArch, vars)
+			task.Config.Output = l.expandVars(task.Config.Output, vars)
+			task.Config.LDFlags = l.expandVars(task.Config.LDFlags, vars)
+			task.Config.BuildTags = l.expandVars(task.Config.BuildTags, vars)
+			task.Config.GoPrivate = l.expandVars(task.Config.GoPrivate, vars)
+			task.Config.GoProxy = l.expandVars(task.Config.GoProxy, vars)
+			task.Config.Mod = l.expandVars(task.Config.Mod, vars)
+			task.Config.Packages = l.expandVars(task.Config.Packages, vars)
 
 			// 替换 images 数组
 			for k := range task.Config.Images {
@@ -108,6 +119,7 @@ func (l *Loader) replaceInPipeline(stages []Stage, vars map[string]string) {
 
 			// 替换 auto_scan 配置
 			if task.Config.AutoScan != nil {
+				task.Config.AutoScan.Pattern = l.expandVars(task.Config.AutoScan.Pattern, vars)
 				task.Config.AutoScan.ImagePrefix = l.expandVars(task.Config.AutoScan.ImagePrefix, vars)
 				task.Config.AutoScan.Tag = l.expandVars(task.Config.AutoScan.Tag, vars)
 			}

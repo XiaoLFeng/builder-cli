@@ -153,9 +153,11 @@ func (v *Validator) validateTask(path string, task Task) {
 		v.validateDockerPushTask(path, task)
 	case TaskTypeSSH:
 		v.validateSSHTask(path, task)
+	case TaskTypeGoBuild:
+		// Go 构建任务可接受默认参数；若使用 go test/generate，可按需补充校验
 	default:
 		v.addError(path+".type",
-			fmt.Sprintf("无效的任务类型: %s (支持: maven, docker-build, docker-push, ssh)", task.Type))
+			fmt.Sprintf("无效的任务类型: %s (支持: maven, docker-build, docker-push, ssh, go-build)", task.Type))
 	}
 }
 

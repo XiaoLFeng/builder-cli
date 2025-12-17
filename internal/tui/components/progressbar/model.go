@@ -1,6 +1,8 @@
 package progressbar
 
 import (
+	"math"
+
 	"github.com/charmbracelet/bubbles/progress"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -12,6 +14,7 @@ type Model struct {
 	total    int
 	width    int
 	message  string
+	lastSet  float64
 }
 
 // New 创建新的进度条组件
@@ -19,6 +22,8 @@ func New() Model {
 	p := progress.New(
 		progress.WithDefaultGradient(),
 		progress.WithoutPercentage(),
+		// 让进度增长具备“弹性”过渡（避免瞬间跳变）
+		progress.WithSpringOptions(14.0, 0.85),
 	)
 	return Model{
 		progress: p,
@@ -36,12 +41,20 @@ func (m *Model) SetSize(width int) {
 }
 
 // SetProgress 设置进度
-func (m *Model) SetProgress(current, total int) {
+func (m *Model) SetProgress(current, total int) tea.Cmd {
 	m.current = current
 	m.total = total
 	if m.total <= 0 {
 		m.total = 1
 	}
+
+	// 触发 progress 内置的弹性动画（由 FrameMsg 驱动）
+	target := m.GetPercent()
+	if math.Abs(target-m.lastSet) > 1e-9 {
+		m.lastSet = target
+		return m.progress.SetPercent(target)
+	}
+	return nil
 }
 
 // SetMessage 设置进度消息

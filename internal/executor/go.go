@@ -151,14 +151,16 @@ func (e *GoBuildExecutor) executeScript(ctx context.Context, handler OutputHandl
 
 // executeDefaultBuild 执行默认构建
 func (e *GoBuildExecutor) executeDefaultBuild(ctx context.Context, handler OutputHandler) error {
-	command := e.buildDefaultCommand()
+	args := e.buildDefaultArgs()
+	logLine := strings.Join(args, " ")
 
-	handler(fmt.Sprintf("🔨 执行 Go %s: %s", e.getGoCommand(), command), false)
+	handler(fmt.Sprintf("🔨 执行 Go %s: %s", e.getGoCommand(), logLine), false)
 	handler(fmt.Sprintf("📁 工作目录: %s", e.getWorkDir()), false)
 	e.printEnvInfo(handler)
 	handler("", false)
 
-	runner := NewCommandRunner(e.Name(), command)
+	runner := NewCommandRunnerWithArgs(e.Name(), args[0], args[1:])
+	runner.SetShell(false)
 	runner.SetWorkingDir(e.getWorkDir())
 	runner.SetTimeout(e.GetTimeout())
 	runner.SetEnv(e.GetEnv())
@@ -166,24 +168,23 @@ func (e *GoBuildExecutor) executeDefaultBuild(ctx context.Context, handler Outpu
 	return runner.Execute(ctx, handler)
 }
 
-// buildDefaultCommand 根据 goCommand 构建默认命令
-func (e *GoBuildExecutor) buildDefaultCommand() string {
+// buildDefaultArgs 根据 goCommand 构建默认命令参数
+func (e *GoBuildExecutor) buildDefaultArgs() []string {
 	goCmd := e.getGoCommand()
 
 	switch goCmd {
 	case "test":
-		return e.buildTestCommand()
+		return e.buildTestArgs()
 	case "generate":
-		return e.buildGenerateCommand()
+		return e.buildGenerateArgs()
 	default:
-		return e.buildBuildCommand()
+		return e.buildBuildArgs()
 	}
 }
 
-// buildBuildCommand 构建 go build 命令
-func (e *GoBuildExecutor) buildBuildCommand() string {
-	var args []string
-	args = append(args, "go", "build")
+// buildBuildArgs 构建 go build 命令参数
+func (e *GoBuildExecutor) buildBuildArgs() []string {
+	args := []string{"go", "build"}
 
 	// -v 详细输出
 	if e.verbose {
@@ -223,13 +224,12 @@ func (e *GoBuildExecutor) buildBuildCommand() string {
 	// 目标包
 	args = append(args, e.getPackages())
 
-	return strings.Join(args, " ")
+	return args
 }
 
-// buildTestCommand 构建 go test 命令
-func (e *GoBuildExecutor) buildTestCommand() string {
-	var args []string
-	args = append(args, "go", "test")
+// buildTestArgs 构建 go test 命令参数
+func (e *GoBuildExecutor) buildTestArgs() []string {
+	args := []string{"go", "test"}
 
 	// -v 详细输出
 	if e.verbose {
@@ -249,13 +249,12 @@ func (e *GoBuildExecutor) buildTestCommand() string {
 	// 目标包
 	args = append(args, e.getPackages())
 
-	return strings.Join(args, " ")
+	return args
 }
 
-// buildGenerateCommand 构建 go generate 命令
-func (e *GoBuildExecutor) buildGenerateCommand() string {
-	var args []string
-	args = append(args, "go", "generate")
+// buildGenerateArgs 构建 go generate 命令参数
+func (e *GoBuildExecutor) buildGenerateArgs() []string {
+	args := []string{"go", "generate"}
 
 	// -v 详细输出
 	if e.verbose {
@@ -265,7 +264,7 @@ func (e *GoBuildExecutor) buildGenerateCommand() string {
 	// 目标包
 	args = append(args, e.getPackages())
 
-	return strings.Join(args, " ")
+	return args
 }
 
 // printEnvInfo 打印环境变量信息

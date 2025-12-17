@@ -13,7 +13,7 @@ func (m Model) View() string {
 	percent := m.GetPercent()
 
 	// 进度条
-	bar := m.progress.ViewAs(percent)
+	bar := m.progress.View()
 
 	// 百分比文本
 	percentText := fmt.Sprintf("%3d%%", int(percent*100))

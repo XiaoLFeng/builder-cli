@@ -127,7 +127,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		return m.handleKeyMsg(msg)
+		if cmd := m.handleKeyMsg(msg); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
 
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
@@ -148,7 +150,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.ensureTaskCard(msg.TaskID)
 
 	case TaskStatusMsg:
-		m.handleTaskStatusMsg(msg)
+		cmds = append(cmds, m.handleTaskStatusMsg(msg))
 
 	case TaskProgressMsg:
 		m.handleTaskProgressMsg(msg)
@@ -163,7 +165,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case PipelineCompleteMsg:
 		if msg.Success {
 			m.state = StateCompleted
-			// 成功完成时，给用户一点时间看结果，然后可以按任意键退出
+			m.statusBar.Stop()
+			// 成功完成时，短暂停留后自动退出，同时保留按键立即退出体验
+			cmds = append(cmds, tea.Tick(2*time.Second, func(time.Time) tea.Msg { return tea.Quit }))
 		} else {
 			m.state = StateFailed
 			m.err = msg.Error
@@ -211,22 +215,28 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // handleKeyMsg 处理按键消息
-func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m *Model) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 	switch {
 	case key.Matches(msg, m.keys.Quit):
 		m.quitting = true
 		if m.cancel != nil {
 			m.cancel()
 		}
-		return m, tea.Quit
+		return tea.Quit
 
 	case key.Matches(msg, m.keys.Enter):
 		if m.state == StateInit {
-			return m, func() tea.Msg { return startPipelineMsg{} }
+			return func() tea.Msg { return startPipelineMsg{} }
 		}
 	}
 
-	return m, nil
+	// 已完成状态下，任意键直接退出，避免卡住非交互环境
+	if m.state == StateCompleted {
+		m.quitting = true
+		return tea.Quit
+	}
+
+	return nil
 }
 
 // ensureTaskCard 确保 taskCard 存在
@@ -247,12 +257,12 @@ func (m *Model) ensureTaskCard(taskID string) {
 }
 
 // handleTaskStatusMsg 处理任务状态消息
-func (m *Model) handleTaskStatusMsg(msg TaskStatusMsg) {
+func (m *Model) handleTaskStatusMsg(msg TaskStatusMsg) tea.Cmd {
 	m.todoList.UpdateTaskStatus(msg.TaskID, msg.Status)
 
 	// 更新进度
 	completed, total := m.todoList.GetProgress()
-	m.progressBar.SetProgress(completed, total)
+	progressCmd := m.progressBar.SetProgress(completed, total)
 	m.statusBar.SetTasks(completed, total)
 
 	// 更新 taskCard 状态
@@ -265,6 +275,8 @@ func (m *Model) handleTaskStatusMsg(msg TaskStatusMsg) {
 			m.failedOutput = card.GetOutputLines()
 		}
 	}
+
+	return progressCmd
 }
 
 // handleTaskProgressMsg 处理任务进度消息
@@ -305,9 +317,12 @@ func (m Model) getTodoHeight() int {
 	// 期望高度：任务数 + 标题/边框占用（最多 8 行）
 	desired := min(len(m.todoList.GetTasks())+2, 8)
 
-	// 运行态 UI（不含实时日志）固定占用：
-	// 标题栏+分隔线+空行(3) + 进度条(2) + 间距(1) + 底部分隔线+状态栏(2) = 8
-	maxFit := m.height - 8
+	// 运行态 UI（不含实时日志）真实固定占用：
+	// header(标题+分隔线+双空行)=4
+	// 进度条块(标题+进度条+双空行)=4
+	// footer(空行+分隔线+状态栏)=3
+	// 合计 11 行
+	maxFit := m.height - 11
 	if maxFit < 0 {
 		maxFit = 0
 	}
@@ -328,15 +343,9 @@ func (m Model) getTodoHeight() int {
 func (m Model) getTerminalHeight() int {
 	todoHeight := m.getTodoHeight()
 
-	// 固定占用（不含日志框本体）：
-	// 标题栏+分隔线+空行(3)
-	// + 日志标题(1)
-	// + 日志与进度条间距(1)
-	// + 进度条(2)
-	// + 进度条与任务队列间距(1)
-	// + 任务队列(todoHeight)
-	// + 底部分隔线+状态栏(2)
-	fixed := 3 + 1 + 1 + 2 + 1 + todoHeight + 2
+	// 固定占用（不含日志框本体），严格按 renderRunningView / View 的换行计算：
+	// header(4) + 日志标题行(1) + 空行(2) + 进度条块(2) + 空行(2) + todo(todoHeight) + footer(3)
+	fixed := todoHeight + 14
 	availableHeight := m.height - fixed
 
 	// 低于 8 行时隐藏（避免 viewport 最小高度修正导致反向溢出）

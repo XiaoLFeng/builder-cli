@@ -47,6 +47,11 @@ func NewDockerBuildExecutor(taskName string, cfg config.TaskConfig) *DockerBuild
 		e.pushOnBuild = *cfg.PushOnBuild
 	}
 
+	// 工作目录（用于解析相对路径）
+	if cfg.WorkingDir != "" {
+		e.SetWorkingDir(cfg.WorkingDir)
+	}
+
 	// 默认值
 	if e.context == "" {
 		e.context = "."
@@ -385,6 +390,17 @@ func (s *DockerScanner) Scan() ([]*DockerBuildExecutor, error) {
 
 // matchPattern 检查路径是否匹配 Dockerfile 模式
 func (s *DockerScanner) matchPattern(path string) bool {
+	if s.pattern != "" {
+		if rel, err := filepath.Rel(s.rootDir, path); err == nil {
+			if matched, _ := filepath.Match(s.pattern, rel); matched {
+				return true
+			}
+		}
+		if matched, _ := filepath.Match(s.pattern, path); matched {
+			return true
+		}
+	}
+
 	base := filepath.Base(path)
 	return base == "Dockerfile" || strings.HasPrefix(base, "Dockerfile.")
 }
