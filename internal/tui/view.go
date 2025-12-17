@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/xiaolfeng/builder-cli/internal/tui/components/taskcard"
 	"github.com/xiaolfeng/builder-cli/pkg/version"
@@ -44,6 +45,12 @@ func (m *Model) View() string {
 
 	// 状态栏
 	b.WriteString(m.statusBar.View())
+
+	// 帮助覆盖层（可折叠）
+	if m.showHelp {
+		b.WriteString("\n\n")
+		b.WriteString(m.renderHelpOverlay())
+	}
 
 	return b.String()
 }
@@ -223,4 +230,50 @@ func (m *Model) renderQuitMessage() string {
 	return lipgloss.NewStyle().
 		Foreground(MutedColor).
 		Render("👋 再见！")
+}
+
+// renderHelpOverlay 渲染帮助面板
+func (m *Model) renderHelpOverlay() string {
+	width := m.width
+	if width < 30 {
+		width = 30
+	}
+	boxWidth := width - 6
+	if boxWidth > 70 {
+		boxWidth = 70
+	}
+
+	rows := []string{
+		formatBinding("启动/退出", m.keys.Enter, m.keys.Quit),
+		formatBinding("日志分页", m.keys.LogPrev, m.keys.LogNext),
+		formatBinding("全部日志", m.keys.LogAll),
+		formatBinding("恢复自动滚动", m.keys.LogResume),
+		formatBinding("日志滚动", m.keys.Up, m.keys.Down, m.keys.PageUp, m.keys.PageDown, m.keys.Home, m.keys.End),
+		formatBinding("任务列表滚动", m.keys.ScrollUp, m.keys.ScrollDown),
+		formatBinding("帮助", m.keys.Help),
+	}
+
+	content := strings.Join(rows, "\n")
+	hint := lipgloss.NewStyle().Foreground(MutedColor).Render("按 ? 关闭")
+	content += "\n\n" + hint
+
+	style := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(PrimaryColor).
+		Padding(1, 2).
+		Width(boxWidth).
+		Align(lipgloss.Left)
+
+	return CenterText(style.Render(content), m.width)
+}
+
+// formatBinding 将多组快捷键渲染成一行
+func formatBinding(label string, bindings ...key.Binding) string {
+	var keys []string
+	for _, b := range bindings {
+		for _, k := range b.Keys() {
+			keys = append(keys, k)
+		}
+	}
+	return fmt.Sprintf("%-10s %s", label, strings.Join(keys, " / "))
 }

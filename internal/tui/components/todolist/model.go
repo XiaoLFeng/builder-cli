@@ -35,6 +35,7 @@ type Model struct {
 	height      int
 	scrollIndex int
 	maxVisible  int
+	showAll     bool
 }
 
 // New 创建新的 Todo List 组件
@@ -60,6 +61,10 @@ func (m *Model) SetSize(width, height int) {
 	m.maxVisible = height - 4
 	if m.maxVisible < 1 {
 		m.maxVisible = 1
+	}
+	// 需求：运行时最多显示 4 行
+	if m.maxVisible > 4 {
+		m.maxVisible = 4
 	}
 	// 调整 scrollIndex 以避免越界
 	m.normalizeScroll()
@@ -139,6 +144,14 @@ func (m *Model) normalizeScroll() {
 		m.scrollIndex = maxStart
 	}
 	if m.scrollIndex < 0 {
+		m.scrollIndex = 0
+	}
+}
+
+// SetShowAll 控制是否展开全部任务（完成/失败态）
+func (m *Model) SetShowAll(show bool) {
+	m.showAll = show
+	if show {
 		m.scrollIndex = 0
 	}
 }

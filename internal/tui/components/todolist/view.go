@@ -16,11 +16,16 @@ func (m Model) View() string {
 		return m.renderEmpty()
 	}
 
+	visibleLimit := len(m.tasks)
+	if !m.showAll && visibleLimit > m.maxVisible {
+		visibleLimit = m.maxVisible
+	}
+
 	var b strings.Builder
 
 	// 计算可显示的任务范围
 	start := m.scrollIndex
-	end := start + m.maxVisible
+	end := start + visibleLimit
 	if end > len(m.tasks) {
 		end = len(m.tasks)
 	}
@@ -35,7 +40,7 @@ func (m Model) View() string {
 	}
 
 	// 如果有更多任务，显示滚动提示
-	if len(m.tasks) > m.maxVisible {
+	if !m.showAll && len(m.tasks) > visibleLimit {
 		scrollInfo := fmt.Sprintf("  %s 显示 %d-%d / %d",
 			styles.IconBullet, start+1, end, len(m.tasks))
 		b.WriteString("\n")

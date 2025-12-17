@@ -62,6 +62,9 @@ type Model struct {
 
 	// 退出标记
 	quitting bool
+
+	// 帮助面板
+	showHelp bool
 }
 
 // New 创建新的主 Model
@@ -166,6 +169,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.Success {
 			m.state = StateCompleted
 			m.statusBar.Stop()
+			m.todoList.SetShowAll(true)
 			// 成功完成时，短暂停留后自动退出，同时保留按键立即退出体验
 			cmds = append(cmds, tea.Tick(2*time.Second, func(time.Time) tea.Msg { return tea.Quit }))
 		} else {
@@ -178,6 +182,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case startPipelineMsg:
 		m.state = StateRunning
+		m.todoList.SetShowAll(false)
 		m.statusBar.Start()
 		cmds = append(cmds, m.runPipeline())
 
@@ -229,11 +234,21 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 			return func() tea.Msg { return startPipelineMsg{} }
 		}
 
+	case key.Matches(msg, m.keys.Help):
+		m.showHelp = !m.showHelp
+		return nil
+
 	case key.Matches(msg, m.keys.LogNext):
 		m.terminal.NextTask()
 		return nil
 	case key.Matches(msg, m.keys.LogPrev):
 		m.terminal.PrevTask()
+		return nil
+	case key.Matches(msg, m.keys.LogAll):
+		m.terminal.ShowAll()
+		return nil
+	case key.Matches(msg, m.keys.LogResume):
+		m.terminal.ResumeAutoScroll()
 		return nil
 	}
 

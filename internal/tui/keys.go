@@ -18,6 +18,8 @@ type KeyMap struct {
 	End        key.Binding
 	LogPrev    key.Binding
 	LogNext    key.Binding
+	LogAll     key.Binding
+	LogResume  key.Binding
 }
 
 // DefaultKeyMap 默认快捷键配置
@@ -78,6 +80,14 @@ var DefaultKeyMap = KeyMap{
 		key.WithKeys("]", "tab"),
 		key.WithHelp("]/tab", "下一个日志页"),
 	),
+	LogAll: key.NewBinding(
+		key.WithKeys("ctrl+a"),
+		key.WithHelp("ctrl+a", "全部日志并置底"),
+	),
+	LogResume: key.NewBinding(
+		key.WithKeys("ctrl+r"),
+		key.WithHelp("ctrl+r", "恢复自动滚动"),
+	),
 }
 
 // ShortHelp 返回简短帮助信息
@@ -91,7 +101,7 @@ func (k KeyMap) FullHelp() [][]key.Binding {
 		{k.Up, k.Down, k.Enter},
 		{k.ScrollUp, k.ScrollDown},
 		{k.PageUp, k.PageDown, k.Home, k.End},
-		{k.LogPrev, k.LogNext},
+		{k.LogPrev, k.LogNext, k.LogAll, k.LogResume},
 		{k.Help, k.Quit},
 	}
 }

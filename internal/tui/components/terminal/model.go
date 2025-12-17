@@ -258,6 +258,24 @@ func (m *Model) PrevTask() {
 	m.updateContent()
 }
 
+// ShowAll 回到“全部日志”并置底
+func (m *Model) ShowAll() {
+	m.selected = ""
+	m.autoScroll = true
+	m.updateContent()
+	if m.ready {
+		m.viewport.GotoBottom()
+	}
+}
+
+// ResumeAutoScroll 重新开启自动滚动并跳到底部（保持当前页）
+func (m *Model) ResumeAutoScroll() {
+	m.autoScroll = true
+	if m.ready {
+		m.viewport.GotoBottom()
+	}
+}
+
 // currentTaskLabel 返回当前页签文本与序号
 func (m Model) currentTaskLabel() (string, int) {
 	if m.selected == "" {
