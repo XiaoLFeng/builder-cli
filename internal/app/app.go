@@ -18,6 +18,7 @@ type BuildOptions struct {
 	StageStart   int      // 开始阶段 (0-based)
 	StageEnd     int      // 结束阶段 (0-based), -1 表示到最后
 	OnlyTasks    []string // 仅执行指定名称的任务
+	TargetServer string   // 仅部署到指定服务器（可选）
 }
 
 // RunBuild 运行构建
@@ -86,6 +87,18 @@ func RunBuild(opts BuildOptions) error {
 			return fmt.Errorf("❌ 没有找到匹配的任务: %v", opts.OnlyTasks)
 		}
 		fmt.Printf("🎯 仅执行任务: %v\n", opts.OnlyTasks)
+	}
+
+	// 过滤服务器（--server 参数，仅作用于 SSH 部署任务）
+	if opts.TargetServer != "" {
+		if _, ok := cfg.Servers[opts.TargetServer]; !ok {
+			return fmt.Errorf("❌ 服务器不存在: %s", opts.TargetServer)
+		}
+		cfg.Pipeline = filterTasksByServer(cfg.Pipeline, opts.TargetServer)
+		if countTotalTasks(cfg.Pipeline) == 0 {
+			return fmt.Errorf("❌ 没有找到匹配服务器 [%s] 的任务", opts.TargetServer)
+		}
+		fmt.Printf("🎯 仅部署到服务器: %s\n", opts.TargetServer)
 	}
 
 	fmt.Printf("✅ 配置验证通过\n")
@@ -251,6 +264,29 @@ func filterTasks(pipeline []config.Stage, onlyTasks []string) []config.Stage {
 		}
 	}
 
+	return result
+}
+
+// filterTasksByServer 仅保留目标服务器的 SSH 任务，其他类型任务保留
+func filterTasksByServer(pipeline []config.Stage, server string) []config.Stage {
+	var result []config.Stage
+	for _, stage := range pipeline {
+		var filtered []config.Task
+		for _, task := range stage.Tasks {
+			if task.Type != config.TaskTypeSSH {
+				filtered = append(filtered, task)
+				continue
+			}
+			if task.Config.Server == server {
+				filtered = append(filtered, task)
+			}
+		}
+		if len(filtered) > 0 {
+			newStage := stage
+			newStage.Tasks = filtered
+			result = append(result, newStage)
+		}
+	}
 	return result
 }
 

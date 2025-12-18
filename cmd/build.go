@@ -13,6 +13,7 @@ import (
 var (
 	buildValidate bool
 	buildOnly     []string // 仅执行指定名称的任务
+	buildServer   string   // 仅部署到指定服务器
 )
 
 // StageRange 阶段范围
@@ -56,9 +57,11 @@ func init() {
 	rootCmd.AddCommand(buildCmd)
 	buildCmd.Flags().BoolVarP(&buildValidate, "validate", "v", false, "构建前先验证配置文件")
 	buildCmd.Flags().StringArrayVarP(&buildOnly, "only", "o", nil, "只执行指定名称的任务（可多次使用）")
+	buildCmd.Flags().StringVarP(&buildServer, "server", "s", "", "仅部署到指定服务器名 (默认全部服务器)")
 
 	// 注册 --only 参数的补全函数
 	_ = buildCmd.RegisterFlagCompletionFunc("only", completeTaskNames)
+	_ = buildCmd.RegisterFlagCompletionFunc("server", completeServerNames)
 }
 
 // completeBuildStages 为 build 命令提供阶段补全
@@ -161,6 +164,7 @@ func runBuild(cmd *cobra.Command, args []string) error {
 		StageStart:   0,
 		StageEnd:     -1,
 		OnlyTasks:    buildOnly, // 仅执行指定任务
+		TargetServer: buildServer,
 	}
 
 	if stageRange != nil {
@@ -184,6 +188,30 @@ func runBuild(cmd *cobra.Command, args []string) error {
 
 	// 运行构建
 	return app.RunBuild(opts)
+}
+
+// completeServerNames 为 --server 参数提供服务器名称补全
+func completeServerNames(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	configFile := GetConfigFile()
+	if configFile == "" {
+		configFile, _ = config.FindConfigFile()
+	}
+
+	if configFile == "" {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	loader := config.NewLoader(configFile)
+	cfg, err := loader.Load()
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	var completions []string
+	for name := range cfg.Servers {
+		completions = append(completions, name)
+	}
+	return completions, cobra.ShellCompDirectiveNoFileComp
 }
 
 // parseStageRange 解析阶段范围参数

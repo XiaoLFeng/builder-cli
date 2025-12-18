@@ -62,9 +62,9 @@ func (m *Model) SetSize(width, height int) {
 	if m.maxVisible < 1 {
 		m.maxVisible = 1
 	}
-	// 需求：运行时最多显示 4 行
-	if m.maxVisible > 4 {
-		m.maxVisible = 4
+	// 需求：运行时最多显示 6 行
+	if m.maxVisible > 6 {
+		m.maxVisible = 6
 	}
 	// 调整 scrollIndex 以避免越界
 	m.normalizeScroll()

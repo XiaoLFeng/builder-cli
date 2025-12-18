@@ -16,6 +16,11 @@ func (m *Model) View() string {
 		return m.renderQuitMessage()
 	}
 
+	// 帮助面板独立覆盖显示
+	if m.showHelp {
+		return m.renderHelpOverlay()
+	}
+
 	var b strings.Builder
 
 	// 标题栏
@@ -45,12 +50,6 @@ func (m *Model) View() string {
 
 	// 状态栏
 	b.WriteString(m.statusBar.View())
-
-	// 帮助覆盖层（可折叠）
-	if m.showHelp {
-		b.WriteString("\n\n")
-		b.WriteString(m.renderHelpOverlay())
-	}
 
 	return b.String()
 }
@@ -235,10 +234,14 @@ func (m *Model) renderQuitMessage() string {
 // renderHelpOverlay 渲染帮助面板
 func (m *Model) renderHelpOverlay() string {
 	width := m.width
+	height := m.height
 	if width < 30 {
 		width = 30
 	}
-	boxWidth := width - 6
+	if height < 10 {
+		height = 10
+	}
+	boxWidth := width - 8
 	if boxWidth > 70 {
 		boxWidth = 70
 	}
@@ -264,7 +267,16 @@ func (m *Model) renderHelpOverlay() string {
 		Width(boxWidth).
 		Align(lipgloss.Left)
 
-	return CenterText(style.Render(content), m.width)
+	box := style.Render(content)
+
+	// 居中漂浮
+	return lipgloss.Place(
+		width,
+		height,
+		lipgloss.Center,
+		lipgloss.Center,
+		box,
+	)
 }
 
 // formatBinding 将多组快捷键渲染成一行
