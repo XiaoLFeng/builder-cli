@@ -45,6 +45,22 @@ func (l *Loader) replaceVariables(cfg *Config) {
 		vars[k] = v
 	}
 
+	// 先对变量值本身进行展开（支持变量间引用）
+	// 多次迭代以支持嵌套引用
+	for i := 0; i < 10; i++ {
+		changed := false
+		for k, v := range vars {
+			expanded := l.expandVars(v, vars)
+			if expanded != v {
+				vars[k] = expanded
+				changed = true
+			}
+		}
+		if !changed {
+			break
+		}
+	}
+
 	// 递归替换所有字符串字段
 	l.replaceInRegistries(cfg.Registries, vars)
 	l.replaceInServers(cfg.Servers, vars)
