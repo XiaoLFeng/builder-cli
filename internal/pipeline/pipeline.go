@@ -226,6 +226,9 @@ func (p *Pipeline) createExecutor(task *Task) (executor.Executor, error) {
 	case config.TaskTypeGoBuild:
 		return executor.NewGoBuildExecutor(task.Name, task.Config), nil
 
+	case config.TaskTypeShell:
+		return executor.NewShellExecutor(task.Name, task.Config), nil
+
 	default:
 		return nil, fmt.Errorf("不支持的任务类型: %s", task.Type)
 	}

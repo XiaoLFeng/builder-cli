@@ -138,4 +138,5 @@ const (
 	TaskTypeDockerPush  = "docker-push"
 	TaskTypeSSH         = "ssh"
 	TaskTypeGoBuild     = "go-build"
+	TaskTypeShell       = "shell"
 )

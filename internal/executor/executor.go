@@ -43,6 +43,7 @@ const (
 	TypeSSH         = "ssh"
 	TypeCommand     = "command"
 	TypeGoBuild     = "go-build"
+	TypeShell       = "shell"
 )
 
 // BaseExecutor 基础执行器（可嵌入其他执行器）

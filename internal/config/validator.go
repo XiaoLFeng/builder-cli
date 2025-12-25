@@ -155,9 +155,11 @@ func (v *Validator) validateTask(path string, task Task) {
 		v.validateSSHTask(path, task)
 	case TaskTypeGoBuild:
 		// Go 构建任务可接受默认参数；若使用 go test/generate，可按需补充校验
+	case TaskTypeShell:
+		v.validateShellTask(path, task)
 	default:
 		v.addError(path+".type",
-			fmt.Sprintf("无效的任务类型: %s (支持: maven, docker-build, docker-push, ssh, go-build)", task.Type))
+			fmt.Sprintf("无效的任务类型: %s (支持: maven, docker-build, docker-push, ssh, go-build, shell)", task.Type))
 	}
 }
 
@@ -211,6 +213,13 @@ func (v *Validator) validateSSHTask(path string, task Task) {
 
 	if len(task.Config.Commands) == 0 && task.Config.Script == "" && task.Config.LocalScript == "" {
 		v.addError(path+".config", "必须指定 commands、script 或 local_script")
+	}
+}
+
+// validateShellTask 验证 Shell 任务
+func (v *Validator) validateShellTask(path string, task Task) {
+	if task.Config.Command == "" && task.Config.Script == "" {
+		v.addError(path+".config", "Shell 任务必须指定 command 或 script")
 	}
 }
 
